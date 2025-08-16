@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flashcards</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        #app-container {
+            flex-grow: 1;
+        }
+        .card {
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+        }
+        .card.is-flipped {
+            transform: rotateY(180deg);
+        }
+        .card-face {
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        .card-face-back {
+            transform: rotateY(180deg);
+        }
+        .btn-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        /* Updated Print Styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printable-screen, #printable-screen * {
+                visibility: visible;
+            }
+            #printable-screen {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .no-print {
+                display: none;
+            }
+            #printable-terms-table td {
+                border: 1px dashed #999;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div id="app-container" class="w-full max-w-2xl mx-auto flex items-center justify-center p-4">
+        
+        <!-- Home Screen -->
+        <div id="home-screen" class="text-center w-full">
+            <h1 class="text-4xl font-bold mb-4">Flashcards</h1>
+            <p class="text-lg text-slate-600 mb-8">Velg et kortsett for å begynne.</p>
+            <div id="set-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Flashcard sets will be loaded here -->
+            </div>
+             <p id="loading-sets" class="mt-4 text-slate-500">Laster kortsett...</p>
+        </div>
+
+        <!-- Mode Selection Screen -->
+        <div id="mode-screen" class="hidden text-center">
+            <h2 id="mode-title" class="text-3xl font-bold mb-8"></h2>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button onclick="startMode('simple')" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                    Enkel Modus
+                </button>
+                <button onclick="startMode('timed')" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                    Tidsstyrt Quiz
+                </button>
+                <button onclick="startMode('printable')" class="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
+                    Printbare Begreper
+                </button>
+            </div>
+            <button onclick="goHome()" class="mt-8 text-slate-500 hover:text-slate-700">&larr; Tilbake til kortsett</button>
+        </div>
+
+        <!-- Simple Mode Screen -->
+        <div id="simple-mode-screen" class="hidden">
+            <div class="text-center mb-4">
+                 <h2 id="simple-mode-title" class="text-2xl font-bold"></h2>
+                 <p id="card-counter" class="text-slate-600"></p>
+            </div>
+            <div id="flashcard-container" class="relative w-full h-64 perspective-1000">
+                <div id="flashcard" class="card w-full h-full absolute cursor-pointer" onclick="flipCard()">
+                    <div class="card-face absolute w-full h-full flex items-center justify-center bg-white rounded-lg shadow-xl p-6 text-center">
+                        <p id="card-term" class="text-2xl"></p>
+                    </div>
+                    <div class="card-face card-face-back absolute w-full h-full flex items-center justify-center bg-blue-100 rounded-lg shadow-xl p-6 text-center">
+                        <p id="card-description" class="text-xl"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-between items-center mt-6">
+                <button id="prev-card" onclick="navigateCard(-1)" class="bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold py-2 px-4 rounded-lg">&larr; Forrige</button>
+                <button onclick="goHome()" class="text-slate-500 hover:text-slate-700">Avslutt</button>
+                <button id="next-card" onclick="navigateCard(1)" class="bg-slate-300 hover:bg-slate-400 text-slate-800 font-bold py-2 px-4 rounded-lg">Neste &rarr;</button>
+            </div>
+        </div>
+
+        <!-- Timed Quiz Mode Screen -->
+        <div id="timed-mode-screen" class="hidden">
+             <div class="bg-white p-6 rounded-lg shadow-xl">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 id="timed-mode-title" class="text-2xl font-bold">Tidsstyrt Quiz</h2>
+                    <div class="text-lg font-semibold">
+                        <span id="timer">00:00</span> | <span id="score">0</span> / <span id="total-questions">0</span>
+                    </div>
+                </div>
+                <div class="bg-slate-100 p-4 rounded-md mb-6 min-h-[100px] flex items-center justify-center">
+                    <p id="quiz-description" class="text-center text-lg"></p>
+                </div>
+                <div id="options-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Options will be here -->
+                </div>
+                 <div class="mt-6 text-center">
+                    <button onclick="goHome()" class="text-slate-500 hover:text-slate-700">Avslutt Quiz</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quiz Results Screen -->
+        <div id="results-screen" class="hidden text-center">
+            <div class="bg-white p-8 rounded-lg shadow-xl">
+                <h2 class="text-3xl font-bold mb-4">Resultater</h2>
+                <p class="text-xl mb-2">Du fikk <span id="final-score" class="font-bold"></span> av <span id="final-total" class="font-bold"></span> riktige.</p>
+                <p class="text-lg text-slate-600 mb-6">Tid brukt: <span id="final-time" class="font-bold"></span></p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                     <button onclick="startMode('timed')" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg">Spill igjen</button>
+                     <button onclick="goHome()" class="bg-slate-500 hover:bg-slate-600 text-white font-bold py-3 px-6 rounded-lg">Til Hovedsiden</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Printable Terms Screen -->
+        <div id="printable-screen" class="hidden w-full">
+            <div class="bg-white p-8 rounded-lg shadow-xl">
+                <h2 id="printable-title" class="text-3xl font-bold mb-6 text-center no-print">Printbare Begreper</h2>
+                <table id="printable-terms-table" class="w-full border-collapse">
+                    <tbody id="printable-terms-body">
+                        <!-- Terms will be loaded here -->
+                    </tbody>
+                </table>
+                <div class="flex justify-center gap-4 mt-8 no-print">
+                    <button onclick="window.print()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded-lg">Print</button>
+                    <button onclick="showScreen('mode')" class="bg-slate-500 hover:bg-slate-600 text-white font-bold py-2 px-6 rounded-lg">Tilbake</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- NEW: Footer -->
+    <footer class="w-full text-center p-4 text-slate-500 text-sm">
+        Laget av Tobias Melbø ved hjelp av Google Gemini
+    </footer>
+
+    <script>
+        // --- STATE MANAGEMENT ---
+        let allCards = [];
+        let currentSet = [];
+        let currentCardIndex = 0;
+        let currentMode = '';
+        let quizTimer;
+        let seconds = 0;
+        let score = 0;
+        
+        // --- Your card sets ---
+        const ALL_CARD_SETS = ['Radioaktivitet ☢️.csv', "Bølger 🌊.csv", "Kjemiske bindinger ⚗️.csv", "Næringsstoffer 🥗.csv"];
+        
+        // --- DOM ELEMENTS ---
+        const screens = {
+            home: document.getElementById('home-screen'),
+            mode: document.getElementById('mode-screen'),
+            simple: document.getElementById('simple-mode-screen'),
+            timed: document.getElementById('timed-mode-screen'),
+            results: document.getElementById('results-screen'),
+            printable: document.getElementById('printable-screen'),
+        };
+        const flashcard = document.getElementById('flashcard');
+        const cardTerm = document.getElementById('card-term');
+        const cardDescription = document.getElementById('card-description');
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCardSets(ALL_CARD_SETS);
+        });
+
+        async function loadCardSets(setFiles) {
+            const setList = document.getElementById('set-list');
+            setList.innerHTML = '';
+            let setsFound = false;
+
+            for (const file of setFiles) {
+                try {
+                    const response = await fetch(`flashcards/${file}`);
+                    if (!response.ok) throw new Error(`Could not load ${file}`);
+                    
+                    const setName = file.replace('.csv', '').replace(/_/g, ' ');
+                    
+                    const button = document.createElement('button');
+                    button.className = 'bg-white hover:bg-slate-50 p-6 rounded-lg shadow-md text-left transition-transform transform hover:scale-105';
+                    button.innerHTML = `<h3 class="text-xl font-semibold">${setName}</h3>`;
+                    button.onclick = () => selectSet(`flashcards/${file}`, setName);
+                    setList.appendChild(button);
+                    setsFound = true;
+                } catch (error) {
+                    console.error('Error loading card set:', error);
+                }
+            }
+            
+            document.getElementById('loading-sets').textContent = setsFound ? '' : 'Fant ingen kortsett. Sørg for at CSV-filene ligger i en "flashcards"-mappe.';
+        }
+
+        async function parseCSV(url) {
+            try {
+                const response = await fetch(url);
+                const text = await response.text();
+                return text.trim().split('\n').map(line => {
+                    const [term, description] = line.split(';');
+                    if (!term || !description) return null;
+                    return { term: term.trim(), description: description.trim() };
+                }).filter(Boolean); // Filter out any null entries from empty lines
+            } catch (error) {
+                console.error("Failed to parse CSV:", error);
+                return [];
+            }
+        }
+
+        // --- NAVIGATION ---
+        function showScreen(screenId) {
+            Object.values(screens).forEach(screen => screen.classList.add('hidden'));
+            if (screens[screenId]) {
+                screens[screenId].classList.remove('hidden');
+            }
+        }
+
+        function goHome() {
+            resetState();
+            showScreen('home');
+        }
+
+        async function selectSet(fileUrl, setName) {
+            allCards = await parseCSV(fileUrl);
+            if (allCards.length === 0) {
+                alert('Dette kortsettet er tomt eller kunne ikke lastes inn.');
+                return;
+            }
+            
+            allCards.sort(() => 0.5 - Math.random());
+
+            currentSet = { name: setName, file: fileUrl };
+            document.getElementById('mode-title').textContent = `Sett: ${setName}`;
+            showScreen('mode');
+        }
+
+        function startMode(mode) {
+            currentMode = mode;
+            if (mode === 'simple') {
+                startSimpleMode();
+            } else if (mode === 'timed') {
+                startTimedQuiz();
+            } else if (mode === 'printable') {
+                startPrintableMode();
+            }
+        }
+        
+        function resetState() {
+            currentCardIndex = 0;
+            if (flashcard.classList.contains('is-flipped')) {
+                flashcard.classList.remove('is-flipped');
+            }
+            clearInterval(quizTimer);
+            seconds = 0;
+            score = 0;
+            currentSet = [];
+            allCards = [];
+            loadCardSets(ALL_CARD_SETS);
+        }
+
+        // --- SIMPLE MODE ---
+        function startSimpleMode() {
+            currentCardIndex = 0;
+            document.getElementById('simple-mode-title').textContent = currentSet.name;
+            updateCard();
+            showScreen('simple');
+        }
+
+        function flipCard() {
+            flashcard.classList.toggle('is-flipped');
+        }
+
+        function navigateCard(direction) {
+            if (flashcard.classList.contains('is-flipped')) {
+                flashcard.classList.remove('is-flipped');
+                setTimeout(() => {
+                    currentCardIndex = (currentCardIndex + direction + allCards.length) % allCards.length;
+                    updateCard();
+                }, 300);
+            } else {
+                currentCardIndex = (currentCardIndex + direction + allCards.length) % allCards.length;
+                updateCard();
+            }
+        }
+
+        function updateCard() {
+            const card = allCards[currentCardIndex];
+            cardTerm.textContent = card.term;
+            cardDescription.textContent = card.description;
+            document.getElementById('card-counter').textContent = `Kort ${currentCardIndex + 1} av ${allCards.length}`;
+        }
+        
+        // --- TIMED QUIZ MODE ---
+        function startTimedQuiz() {
+            score = 0;
+            seconds = 0;
+            currentSet.cards = [...allCards].sort(() => 0.5 - Math.random());
+            currentCardIndex = 0;
+            
+            document.getElementById('timed-mode-title').textContent = currentSet.name;
+            document.getElementById('total-questions').textContent = currentSet.cards.length;
+            updateScore();
+            
+            startTimer();
+            nextQuestion();
+            showScreen('timed');
+        }
+
+        function nextQuestion() {
+            if (currentCardIndex >= currentSet.cards.length) {
+                showResults();
+                return;
+            }
+
+            const currentCard = currentSet.cards[currentCardIndex];
+            document.getElementById('quiz-description').textContent = currentCard.description;
+
+            const wrongOptions = allCards
+                .filter(card => card.term !== currentCard.term)
+                .sort(() => 0.5 - Math.random())
+                .slice(0, 3);
+
+            const options = [...wrongOptions, currentCard].sort(() => 0.5 - Math.random());
+
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = '';
+            options.forEach(option => {
+                const button = document.createElement('button');
+                button.className = 'w-full text-left p-4 bg-white hover:bg-blue-100 border border-slate-300 rounded-lg transition-colors';
+                button.textContent = option.term;
+                button.onclick = (event) => checkAnswer(option.term === currentCard.term, event.target);
+                optionsContainer.appendChild(button);
+            });
+        }
+
+        function checkAnswer(isCorrect, button) {
+            const buttons = document.querySelectorAll('#options-container button');
+            buttons.forEach(btn => {
+                btn.disabled = true;
+                btn.classList.add('btn-disabled');
+            });
+
+            if (isCorrect) {
+                score++;
+                button.classList.remove('bg-white', 'hover:bg-blue-100');
+                button.classList.add('bg-green-500', 'text-white');
+            } else {
+                button.classList.remove('bg-white', 'hover:bg-blue-100');
+                button.classList.add('bg-red-500', 'text-white');
+                buttons.forEach(btn => {
+                    if (btn.textContent === currentSet.cards[currentCardIndex].term) {
+                        btn.classList.remove('bg-white', 'hover:bg-blue-100');
+                        btn.classList.add('bg-green-500', 'text-white');
+                    }
+                });
+            }
+            updateScore();
+            
+            setTimeout(() => {
+                currentCardIndex++;
+                nextQuestion();
+            }, 1200);
+        }
+
+        function showResults() {
+            clearInterval(quizTimer);
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('final-total').textContent = currentSet.cards.length;
+            document.getElementById('final-time').textContent = formatTime(seconds);
+            showScreen('results');
+        }
+
+        // --- UPDATED: Printable Mode Function ---
+        function startPrintableMode() {
+            const tableBody = document.getElementById('printable-terms-body');
+            tableBody.innerHTML = ''; // Clear previous terms
+            document.getElementById('printable-title').textContent = `Begreper fra: ${currentSet.name}`;
+
+            const sortedCards = [...allCards].sort((a, b) => a.term.localeCompare(b.term, 'no'));
+            const columns = 2; // Set to 2 columns for better printing
+
+            for (let i = 0; i < sortedCards.length; i += columns) {
+                const row = document.createElement('tr');
+                
+                for (let j = 0; j < columns; j++) {
+                    const cell = document.createElement('td');
+                    cell.className = 'p-3 border border-dashed border-slate-400 text-base w-1/2';
+                    if (sortedCards[i + j]) {
+                        cell.textContent = sortedCards[i + j].term;
+                    } else {
+                        cell.innerHTML = '&nbsp;'; // Add empty space for uneven numbers
+                    }
+                    row.appendChild(cell);
+                }
+                tableBody.appendChild(row);
+            }
+
+            showScreen('printable');
+        }
+
+        // --- UTILITIES ---
+        function startTimer() {
+            const timerEl = document.getElementById('timer');
+            quizTimer = setInterval(() => {
+                seconds++;
+                timerEl.textContent = formatTime(seconds);
+            }, 1000);
+        }
+
+        function formatTime(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+            const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+            return `${minutes}:${seconds}`;
+        }
+        
+        function updateScore() {
+            document.getElementById('score').textContent = score;
+        }
+
+    </script>
+</body>
+</html>
