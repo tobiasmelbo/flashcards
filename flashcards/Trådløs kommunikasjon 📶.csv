@@ -1,0 +1,10 @@
+Informasjonsbærer;Det som bærer signalet fra sender til mottaker. Kan være elektromagnetisk stråling, lyd, strøm etc...
+Morse;En måte å kode en beskjed ved korte signal, lange signal og pauser.
+Basestasjon;Et sted som mottar og sender elektromagnetisk stråling som f.eks mobilnett og telefoni.
+Antennelengde;Proporsjonalt med frekvensen på signalet som sendes/mottas.
+Analog modulasjon;Å pakke inn et analogt signal i en bølge.
+Digital modulasjon;Å pakke inn et digitalt signal (0 og 1) i en bølge.
+Amplitudemodulasjon (AM);Å pakke et signal inn i en bærebølge ved å endre på amplituden på bølgen.
+Frekvensmodulasjon (FM);Å pakke inn et signal i en bærebølge ved å endre på frekvensen i bølgen.
+Binære tall;Tall i totallsystemet. Brukes av datamaskiner og mobiler til å representere f.eks tekst, bilder, lyd og kattevideoer.
+WiFi-Router;En slags basestasjon for nettet hjemme. Mange gir valg mellom 5 GHz og 2.4 GHz.
